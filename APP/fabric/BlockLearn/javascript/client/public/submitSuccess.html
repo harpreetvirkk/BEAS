@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+
+    <title>BlockLearn</title>
+
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/2.0.0/jquery.min.js"></script>
+    <script src="https://apis.google.com/js/client.js?onload=onClientLoad" type="text/javascript"></script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+
+  </head>
+  <style>
+    body {
+    background-color: #2c6ed5;
+    }
+    .center {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    margin-bottom: 30px;
+    width: 50%;
+  }
+
+  </style>
+
+  <body>
+      <nav class="navbar navbar-default">
+          <div class="container-fluid">
+            
+            <div class="navbar-header">
+              <a class="navbar-brand" href="#">BlockLearn Client Interface</a>
+            </div>
+            <ul class="nav navbar-nav">
+              <li class="active"><a href="#">Dashboard Links</a></li>
+              <li><a href="./about.html">About</a></li>
+            </ul>
+          </div>
+      </nav>
+
+      <div class="container-fluid">
+        <!-- <img src="https://i.ibb.co/P9ppRG7/icon.png" style="width:200px;height:120px;" class = "center"> -->
+        <div style="text-align:center; padding:50px 50px 50px 50px; color:white;">
+            <h1 style="font-size: 60px;"">BlockLearn</h1>
+            <h3>New Block Submitted</h3>
+        </div>
+        <pre>
+            <div id="result" class="json-result">
+            </div>
+        </pre>
+      </div>
+
+  </body>
+
+</html>
