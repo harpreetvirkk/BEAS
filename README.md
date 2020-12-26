@@ -1,2 +1,2 @@
-# DAFML
-Decentralised Asynchronous Federated Machine Learning using Blockchain
+# BEAS
+Blockchain Enabled Asynchronous & Secure Federated Machine Learning
