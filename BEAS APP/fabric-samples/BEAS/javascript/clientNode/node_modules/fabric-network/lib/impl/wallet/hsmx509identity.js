@@ -1,0 +1,95 @@
+"use strict";
+/*
+ * Copyright 2019 IBM All Rights Reserved.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.HsmX509Provider = void 0;
+const fabric_common_1 = require("fabric-common");
+const Logger = require("../../logger");
+const logger = Logger.getLogger('HsmX509Identity');
+/**
+ * Identity provider to handle X.509 identities where the private key is stored in a hardware security module.
+ * @memberof module:fabric-network
+ * @implements module:fabric-network.IdentityProvider
+ */
+class HsmX509Provider {
+    /**
+     * Create a provider instance.
+     * @param {module:fabric-network.HsmOptions} [options={}] Options specifying how to connect to the HSM. Mandatory
+     * unless this information is provided through external configuration.
+     */
+    constructor(options = {}) {
+        this.type = 'HSM-X.509';
+        this.options = {};
+        Object.assign(this.options, options);
+        this.options.software = false; // Must be set to enable HSM
+        this.cryptoSuite = fabric_common_1.User.newCryptoSuite(this.options);
+    }
+    getCryptoSuite() {
+        return this.cryptoSuite;
+    }
+    fromJson(data) {
+        if (data.type !== this.type) {
+            throw new Error('Invalid identity type: ' + data.type);
+        }
+        if (data.version === 2) {
+            const x509Data = data;
+            return {
+                credentials: {
+                    certificate: x509Data.credentials.certificate,
+                    privateKey: x509Data.credentials.privateKey,
+                },
+                mspId: x509Data.mspId,
+                type: 'HSM-X.509',
+            };
+        }
+        else if (data.version === 1) {
+            const x509Data = data;
+            logger.error('HSM-X.509 identity data is missing the privateKey handle. This credential must be saved using v2 format');
+            return {
+                credentials: {
+                    certificate: x509Data.credentials.certificate,
+                    privateKey: '' // force dummy in to fail later
+                },
+                mspId: x509Data.mspId,
+                type: 'HSM-X.509',
+            };
+        }
+        else {
+            throw new Error('Unsupported identity version: ' + data.version);
+        }
+    }
+    toJson(identity) {
+        const data = {
+            credentials: {
+                certificate: identity.credentials.certificate,
+                privateKey: identity.credentials.privateKey
+            },
+            mspId: identity.mspId,
+            type: 'HSM-X.509',
+            version: 2,
+        };
+        return data;
+    }
+    async getUserContext(identity, name) {
+        if (!identity) {
+            throw Error('HSM X.509 identity is missing');
+        }
+        else if (!identity.credentials) {
+            throw Error('HSM X.509 identity is missing the credential data.');
+        }
+        else if (!identity.credentials.privateKey) {
+            throw Error('HSM X.509 identity data is missing the private key handle. Check that the data has been saved to the wallet in v2 format');
+        }
+        const user = new fabric_common_1.User(name);
+        user.setCryptoSuite(this.cryptoSuite);
+        const handle = Buffer.from(identity.credentials.privateKey, 'hex');
+        const privateKey = new fabric_common_1.Pkcs11EcdsaKey({ priv: handle }, this.cryptoSuite.getKeySize());
+        await user.setEnrollment(privateKey, identity.credentials.certificate, identity.mspId);
+        return user;
+    }
+}
+exports.HsmX509Provider = HsmX509Provider;
+//# sourceMappingURL=hsmx509identity.js.map

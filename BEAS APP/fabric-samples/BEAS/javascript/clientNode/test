@@ -1,0 +1,147 @@
+await form.on('file', async function(name, file) {
+    fs.rename(file.path, form.uploadDir + "/data.csv", function(error) {
+        if (error)
+            throw error; // process error
+    });
+    console.log('Uploaded ' + file.name);
+    var myPythonScriptPath = './model/model.py';
+    var pyshell = await new PythonShell(myPythonScriptPath, {args: [key.toString()]});
+
+    pyshell.on('message', function(message) {
+        console.log(message);
+    });
+    var blockData;
+    pyshell.end( async function(err) {
+        if (err) {
+            throw err;
+        };
+        console.log('finished');
+        try {
+            var outputWeightsFile = fs.readFileSync('./output.h5');
+            hash.update(outputWeightsFile);
+            var weightHash = hash.digest('hex');
+            var prevBlockId = key;
+            var blockType = 'L'
+    
+            // Submit to Ledger
+            let timestamp = new Date();
+    
+            await contract.submitTransaction('createBlock', blockType.toString(), weightHash.toString(), prevBlockId.toString(), timestamp.toString());
+            console.log('Weight Block has been submitted');
+
+            // Get block info
+            let block = await contract.evaluateTransaction('queryLedger', weightHash);
+            blockData = JSON.parse(block.toString());
+            if (blockData == 0){
+                await gateway.disconnect();
+                response.send('Error!');
+            } 
+
+            // Sending File to Mongo
+
+            await client.connect(err => {
+                const WFcollection = client.db("BL").collection("WeightFiles");
+                var insert_data = {
+                    blockKey : (blockData.Key).toString(),
+                    blockType : 'L',
+                    file_name : ((blockData.Key).toString()) + '.h5',
+                    timestamp : timestamp,
+                    file_data : Binary(outputWeightsFile)
+                };
+                WFcollection.insertOne(insert_data, async function(err, res) {
+                    if (err) throw err;
+                    console.log("Weight File inserted to DB!");
+                    let latestLocals = await contract.evaluateTransaction('getLatestLocals');
+                    let latestLocalsKeys = JSON.parse(latestLocals.toString());
+                    // console.log(latestLocalsKeys);
+                    let mydocs;
+                    if (latestLocalsKeys.length % mergeLen == 0) {
+                        await WFcollection.find({}).toArray(async function(err, result) {
+                            console.log(result);
+                            mydocs = result;
+                            if (err){
+                                throw err;
+                            } else {
+                                for (let doc of mydocs){
+                                    fs.writeFile(path.join('./merge/', doc.file_name.toString()), doc.file_data.buffer, "binary", async function(err) {
+                                        if(err) {
+                                            console.log(err);
+                                        }});};
+                                console.log("The file was saved!");
+                                var myPythonScriptPath = './model/merge.py';
+                                var pyshell = await new PythonShell(myPythonScriptPath, {});
+                                
+                                pyshell.on('message', function(message) {
+                                    console.log(message);
+                                });
+                                pyshell.end( async function(err) {
+                                    if (err) {
+                                        throw err;
+                                    };
+                                    console.log('finished merging');
+                                    try {
+                                        var outputWeightsFile = fs.readFileSync('./mergeG/newG.h5');
+                                        hash.update(outputWeightsFile);
+                                        var weightHash = hash.digest('hex');
+                                        var prevBlockId = key;
+                                        var blockType = 'G'
+                                
+                                        // Submit to Ledger
+                                        let timestamp = new Date();
+                                
+                                        await contract.submitTransaction('createBlock', blockType.toString(), weightHash.toString(), prevBlockId.toString(), timestamp.toString());
+                                        console.log('Weight Block has been submitted');
+                        
+                                        // Get block info
+                                        let block = await contract.evaluateTransaction('queryLedger', weightHash);
+                                        blockData = JSON.parse(block.toString());
+                                        if (blockData == 0){
+                                            await gateway.disconnect();
+                                            response.send('Error!');
+                                                    } 
+                                    
+                                        // Sending File to Mongo
+                        
+                                        await client.connect(err => {
+                                            const WFcollection = client.db("BL").collection("WeightFiles");
+                                            var insert_data = {
+                                                blockKey : (blockData.Key).toString(),
+                                                blockType : 'G',
+                                                file_name : ((blockData.Key).toString()) + '.h5',
+                                                timestamp : timestamp,
+                                                file_data : Binary(outputWeightsFile)
+                                            };
+                                            WFcollection.insertOne(insert_data, async function(err, res) {
+                                                if (err) throw err;
+                                                console.log("Weight File inserted to DB!");
+                                            });
+                                            // fs.rmdir('./merge', { recursive: true }).then(() => console.log('directory removed!'));
+                                        });
+                                        } catch (e){
+                                            console.log(e);
+                                        };
+                                    });
+                                }});
+                    };
+                    let html = prettyPrintJson.toHtml(blockData);
+                    fs.readFile(__dirname + '/public/submitSuccess.html', function(err, data) {
+                    response.writeHead(200, { 'Content-Type': 'text/html' });
+                    response.write(data + '<script>document.getElementById("result").innerHTML =`' + html + '`;</script>');
+                });
+                });
+            });
+
+            
+        } catch (error) {
+            console.error(error);
+            process.exit(1);
+        };
+    });
+});
+
+await gateway.disconnect();
+
+} catch (error) {
+console.error(`Failed!`);
+process.exit(1);
+}
